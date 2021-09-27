@@ -1,5 +1,6 @@
 const Joi = require("joi");
 const express = require("express");
+const db = require("./database");
 const app = express();
 app.use(express.json());
 
@@ -23,13 +24,18 @@ app.get("/", (req, resp) => {
   resp.send("Hello, World!!!");
 });
 
-app.get("/api/courses", (req, resp) => {
-  resp.send(courses);
+app.get("/api/courses", async (req, resp) => {
+  const result = await db.promise().query(`select * from course`);
+  const courses = result[0];
+  resp.status(200).send(courses);
 });
 
-app.get("/api/courses/:id", (req, resp) => {
+app.get("/api/courses/:id", async (req, resp) => {
   // get course by id
-  const course = courses.find((c) => c.id === parseInt(req.params.id));
+  const result = await db
+    .promise()
+    .query(`select * from course where id='${req.params.id}'`);
+  const course = result[0][0];
   if (!course) {
     return resp.status(404).send("The course with the given ID was not found.");
   }
@@ -46,19 +52,22 @@ app.post("/api/courses", (req, resp) => {
     return;
   }
 
-  // set course
-  const course = {
-    id: courses.length + 1,
-    name: req.body.name,
-  };
-  courses.push(course);
-  resp.send(course);
+  // store course in db
+  try {
+    db.query(`insert into course(name) value ('${req.body.name}')`);
+    resp.status(200).send({ msg: "Course created" });
+  } catch (err) {
+    console.log(err);
+  }
 });
 
 // PUT
-app.put("/api/courses/:id", (req, resp) => {
+app.put("/api/courses/:id", async (req, resp) => {
   // get course by id
-  const course = courses.find((c) => c.id === parseInt(req.params.id));
+  const result = await db
+    .promise()
+    .query(`select * from course where id='${req.params.id}'`);
+  const course = result[0][0];
   if (!course) {
     return resp.status(404).send("The course with the given ID was not found.");
   }
@@ -71,21 +80,30 @@ app.put("/api/courses/:id", (req, resp) => {
   }
 
   // update course
-  course.name = req.body.name;
+  try {
+    db.query(`update course set name='${req.body.name}' where id='${req.params.id}';`);
+  } catch (err) {
+    console.log(err);
+  }
+
   resp.send(course);
 });
 
 // DELETE
-app.delete("/api/courses/:id", (req, resp) => {
+app.delete("/api/courses/:id", async (req, resp) => {
   // get course by id
-  const course = courses.find((c) => c.id === parseInt(req.params.id));
-  if (!course) {
+  const result = await db
+    .promise()
+    .query(`select * from course where id='${req.params.id}'`);
+  const course = result[0][0];
+
+  // delete course
+  if (course) {
+    db.query(`delete from course where id='${req.params.id}'`);
+  } else {
     return resp.status(404).send("The course with the given ID was not found.");
   }
 
-  // delete
-  const index = courses.indexOf(course);
-  courses.splice(index, 1);
   resp.send(course);
 });
 
